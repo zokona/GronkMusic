@@ -21,4 +21,6 @@ TOKEN=PUT BOT TOKEN HERE
 YT_KEY=PUT YOUTUBE API KEY HERE
 ```
 
+Then install Opus in any way that you want and input the path to it in the `load_opus()` part.
+
 Then just run main.py and everything should work!

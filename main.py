@@ -26,7 +26,29 @@ tree = bot.tree
 def search_result(search: str):
     cured_search = search.replace(" ", "%20")
     results = requests.get(f"https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q={cured_search}&type=video&key={yt_api_key}")
-    print(results.json())
+    json = results.json()['items']
+    end_result = [[],[],[]]
+    for i in json:
+        end_result[0].append(i['snippet']['title'])
+        end_result[1].append(i['snippet']['channelTitle'])
+        end_result[2].append(i['id']['videoId'])
+    return end_result
+
+class SearchButton(discord.ui.Button):
+    def __init__(self, *, label: str, custom_id: str):
+        super().__init__(label=label, custom_id=custom_id, style=discord.ButtonStyle.green)
+        
+    async def callback(self, ctx: discord.Interaction):
+        voice: discord.VoiceClient
+        
+        if bot.user not in ctx.user.voice.channel.members:
+            voice = await ctx.user.voice.channel.connect(timeout=1)
+        if ctx.user.voice:
+            voice = bot.voice_clients[0]
+            source = sp.Popen(["yt-dlp", "--audio-format", "opus", "-x", "-o", '-', f'{self.custom_id}'], stdout=sp.PIPE)
+            audio_source = discord.FFmpegPCMAudio(source.stdout, pipe=True)
+            voice.play(audio_source, after=lambda e: source.terminate())
+            await ctx.response.send_message("Started playback.")
 
 @bot.event
 async def on_voice_state_update(member: discord.User, before: discord.VoiceState, after: discord.VoiceState):
@@ -56,8 +78,23 @@ async def stop(ctx: discord.Interaction):
 @tree.command(name="search", description="Search Youtube for music.")
 @app_commands.describe(query="The search query.")
 async def search(ctx: discord.Interaction, query: str):
-    search_result(query)
-    await ctx.response.send_message("check your balls")
+    searched = search_result(query)
+    
+    embed = Embed(
+        color=discord.Color.pink(),
+        title="Search Results",
+    )
+    
+    buttons = []
+    view = discord.ui.View()
+    
+    for i,v in enumerate(searched[0]):
+        embed.add_field(name=f"{i+1}. {searched[1][i]}", value=v, inline=False)
+        buttons.append(SearchButton(label=f"Play #{i+1}", custom_id=searched[2][i]))
+        
+    [view.add_item(i) for i in buttons]
+    
+    await ctx.response.send_message(embed=embed, view=view)
     
 @tree.command(name="leave", description="GronkMusic leaves the VC.")
 async def leave(ctx: discord.Interaction):
